@@ -1,0 +1,52 @@
+name: Build Seafarer Fatigue AI v3 Health Connect APK
+
+on:
+  push:
+    branches:
+      - seafarer-fatigue-healthconnect-v3
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Extract Android project
+        run: |
+          rm -rf seafarer-fatigue-ci
+          mkdir seafarer-fatigue-ci
+          unzip -q seafarer-fatigue-v3-ci-project.zip -d seafarer-fatigue-ci
+
+      - name: Build wearable-enabled debug APK
+        working-directory: seafarer-fatigue-ci
+        run: gradle :app:assembleDebug --stacktrace
+
+      - name: Prepare APK artifact
+        run: |
+          cp seafarer-fatigue-ci/app/build/outputs/apk/debug/app-debug.apk Seafarer_Fatigue_AI_v3_HealthConnect.apk
+          sha256sum Seafarer_Fatigue_AI_v3_HealthConnect.apk | tee Seafarer_Fatigue_AI_v3_HealthConnect_SHA256.txt
+          ls -lh Seafarer_Fatigue_AI_v3_HealthConnect.apk
+
+      - name: Upload installable APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: Seafarer_Fatigue_AI_v3_HealthConnect
+          path: |
+            Seafarer_Fatigue_AI_v3_HealthConnect.apk
+            Seafarer_Fatigue_AI_v3_HealthConnect_SHA256.txt
+          if-no-files-found: error
+          retention-days: 7
