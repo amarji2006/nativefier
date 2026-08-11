@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Seafarer Fatigue AI</title>
+<style>
+:root{--navy:#082a60;--blue:#1455a0;--light:#f4f8fd;--border:#cbd8e8;--green:#167044;--amber:#b87908;--orange:#c75c12;--red:#b3261e;--purple:#6c4aa5;--text:#161b22;--muted:#5f6b7a}
+*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;background:#edf3f9;color:var(--text)}
+header{background:linear-gradient(135deg,var(--navy),#0d468f);color:#fff;padding:18px 18px 14px;position:sticky;top:0;z-index:10;box-shadow:0 2px 10px #0002}header h1{font-size:21px;margin:0 0 4px}header p{font-size:12px;margin:0;opacity:.9}.wrap{max-width:1050px;margin:auto;padding:14px}
+.card{background:#fff;border:1px solid var(--border);border-radius:14px;padding:14px;margin:0 0 12px;box-shadow:0 3px 10px #0b2c4f0d}.card h2{font-size:16px;color:var(--navy);margin:0 0 10px}.card h3{font-size:14px;color:var(--blue);margin:12px 0 8px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}@media(max-width:760px){.grid,.grid3,.grid4{grid-template-columns:1fr}}
+label{display:block;font-size:12px;font-weight:700;color:#334155;margin-bottom:4px}.field input,.field select,.field textarea{width:100%;padding:10px 11px;border:1px solid #b9c7d8;border-radius:9px;background:#fff;font-size:15px}.field textarea{min-height:68px;resize:vertical}.check{display:flex;align-items:center;gap:8px;padding:10px;border:1px solid #d7e1ed;border-radius:9px;background:#f9fbfe}.check input{width:20px;height:20px}
+.actions{display:flex;flex-wrap:wrap;gap:8px}.btn{border:0;border-radius:10px;padding:11px 14px;font-weight:700;font-size:13px;cursor:pointer}.primary{background:var(--navy);color:#fff}.secondary{background:#e6eef9;color:var(--navy);border:1px solid #c6d5e9}.green{background:var(--green);color:#fff}.danger{background:#fdebea;color:#9e2a23;border:1px solid #efbbb8}.smallbtn{padding:6px 9px;font-size:11px;border-radius:8px}
+.status{margin-top:10px;padding:10px;border-radius:9px;background:#edf6ff;color:#174d7c;font-size:12px;line-height:1.45}.small{font-size:11px;color:var(--muted);line-height:1.45}.notice{border-left:4px solid var(--blue);padding:9px 10px;background:#f2f7fd;font-size:12px;line-height:1.5}.warn{border-left-color:var(--orange);background:#fff8ed}.ok{border-left-color:var(--green);background:#f0f8f3}.bad{border-left-color:var(--red);background:#fff1f0}.purple{border-left-color:var(--purple);background:#f7f2fd}
+.result{display:none}.scoreWrap{text-align:center;padding:15px;border-radius:14px;background:var(--light);border:1px solid var(--border)}.score{font-size:48px;font-weight:800;color:var(--navy);line-height:1}.level{font-size:20px;font-weight:800;margin-top:7px}.low{color:var(--green)}.moderate{color:var(--amber)}.high{color:var(--orange)}.veryhigh{color:var(--red)}
+.bar{height:14px;border-radius:20px;background:linear-gradient(90deg,#24a148 0 25%,#f2c94c 25% 50%,#f2994a 50% 75%,#d64545 75% 100%);position:relative;margin:15px 0}.needle{position:absolute;top:-5px;width:4px;height:24px;background:#111;border-radius:2px;transition:left .35s}
+ul.drivers{padding-left:20px;margin:7px 0}.forecast{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}@media(max-width:650px){.forecast{grid-template-columns:repeat(2,1fr)}}.forecast div{padding:10px;text-align:center;border-radius:9px;background:#f6f9fc;border:1px solid #d9e2ed}.forecast b{font-size:19px;color:var(--navy)}
+.badge{display:inline-block;padding:3px 7px;border-radius:20px;background:#e7f2ec;color:var(--green);font-size:11px;font-weight:700}.pill{display:inline-block;padding:3px 8px;border-radius:99px;background:#eef3f9;color:#334155;font-size:10px;font-weight:700;margin:2px}.pill.red{background:#fdebea;color:#a8322b}.pill.orange{background:#fff0df;color:#9b550d}.pill.green{background:#e8f6ee;color:#16653f}.pill.purple{background:#f1ebfa;color:#68479b}
+.tableWrap{overflow-x:auto}.timeline{width:100%;border-collapse:collapse;font-size:11px}.timeline th,.timeline td{border-bottom:1px solid #e4ebf3;padding:7px 6px;text-align:left;vertical-align:top}.timeline th{color:var(--navy);background:#f5f8fc;position:sticky;top:0}.timeline td:nth-child(4){min-width:120px}.timeline td:last-child{white-space:nowrap}
+.regGrid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}@media(max-width:760px){.regGrid{grid-template-columns:1fr}}.regBox{padding:12px;border-radius:11px;border:1px solid var(--border);background:#f8fafc}.regTitle{font-size:12px;font-weight:800;color:var(--navy);margin-bottom:7px}.regStatus{font-size:17px;font-weight:800;margin-bottom:4px}.metricLine{font-size:12px;line-height:1.55}.divider{height:1px;background:#dde5ef;margin:12px 0}.footer{font-size:10px;color:#617080;padding:10px 2px 24px;text-align:center}
+</style>
+</head>
+<body>
+<header><h1>AI Seafarer Fatigue Risk Predictor</h1><p>Android Onboard Offline Edition v3.0 â€¢ Regulatory status + actual fatigue-risk decision support</p></header>
+<div class="wrap">
+
+<div class="card">
+<h2>Wearable Data Feed</h2>
+<div class="actions"><button class="btn green" onclick="syncHealth()">SYNC HEALTH CONNECT</button><button class="btn secondary" onclick="importWearable()">IMPORT WEARABLE JSON / CSV</button><button class="btn secondary" onclick="openHealthSettings()">HEALTH SETTINGS</button></div>
+<div id="wearableStatus" class="status">No wearable data loaded. The app works manually if a wearable is unavailable.</div>
+<div class="small" style="margin-top:8px">Health Connect is read locally on the phone. The fatigue model itself does not require internet. Sleep from a consumer wearable is treated as wearable-estimated sleep, not medical-grade polysomnography.</div>
+</div>
+
+<div class="card"><h2>1. Seafarer & Watch Profile</h2><div class="grid">
+<div class="field"><label>Rank</label><input id="rank" value="Second Engineer"></div>
+<div class="field"><label>Department</label><select id="department"><option>Engine</option><option>Deck</option><option>Electrical</option><option>Catering / Hotel</option><option>Other</option></select></div>
+<div class="field"><label>Watch System</label><select id="watch"><option>4-on / 8-off</option><option>6-on / 6-off</option><option>Daywork</option><option>Other</option></select></div>
+<div class="field"><label>KSS observed sleepiness (0 = not entered, 1â€“9)</label><input id="kss" type="number" min="0" max="9" step="1" value="0"></div>
+</div></div>
+
+<div class="card"><h2>2. Sleep & Recovery</h2><div class="grid3">
+<div class="field"><label>Wearable-estimated / actual sleep last 24 h (hours)</label><input id="sleep" type="number" min="1" max="14" step="0.1" value="6.0"></div>
+<div class="field"><label>Sleep quality (1 poor â€“ 5 excellent)</label><input id="quality" type="number" min="1" max="5" step="1" value="3"></div>
+<div class="field"><label>Sleep interruptions</label><input id="interruptions" type="number" min="0" max="20" step="1" value="2"></div>
+<div class="field"><label>Sleep efficiency (%)</label><input id="efficiency" type="number" min="40" max="100" step="1" value="83"></div>
+<div class="field"><label>Hours continuously awake</label><input id="awake" type="number" min="1" max="32" step="0.5" value="12"></div>
+<div class="field"><label>R¶»§q«^v)í¢‰bž×«}§

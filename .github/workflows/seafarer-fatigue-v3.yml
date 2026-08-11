@@ -25,19 +25,13 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Extract Android project
-        run: |
-          rm -rf seafarer-fatigue-ci
-          mkdir seafarer-fatigue-ci
-          unzip -q seafarer-fatigue-v3-ci-project.zip -d seafarer-fatigue-ci
-
       - name: Build wearable-enabled debug APK
-        working-directory: seafarer-fatigue-ci
+        working-directory: seafarer-fatigue-app-v3
         run: gradle :app:assembleDebug --stacktrace
 
       - name: Prepare APK artifact
         run: |
-          cp seafarer-fatigue-ci/app/build/outputs/apk/debug/app-debug.apk Seafarer_Fatigue_AI_v3_HealthConnect.apk
+          cp seafarer-fatigue-app-v3/app/build/outputs/apk/debug/app-debug.apk Seafarer_Fatigue_AI_v3_HealthConnect.apk
           sha256sum Seafarer_Fatigue_AI_v3_HealthConnect.apk | tee Seafarer_Fatigue_AI_v3_HealthConnect_SHA256.txt
           ls -lh Seafarer_Fatigue_AI_v3_HealthConnect.apk
 
