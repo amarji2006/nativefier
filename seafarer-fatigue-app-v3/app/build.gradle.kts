@@ -5,7 +5,7 @@ plugins {
 
 android {
     namespace = "com.maritimefatigue.ai"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.maritimefatigue.ai"
