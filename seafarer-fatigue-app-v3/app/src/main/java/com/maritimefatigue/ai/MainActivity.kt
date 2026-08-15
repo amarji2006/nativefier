@@ -44,7 +44,7 @@ class MainActivity : ComponentActivity() {
         if (pendingHealthSync) {
             pendingHealthSync = false
             if (granted.containsAll(healthPermissions)) readHealthData()
-            else sendHealthError("Health Connect permission was not granted. Manual or file import remains available.")
+            else sendMessage("Health Connect permission was not granted. Manual entry and JSON/CSV import remain available.")
         }
     }
 
@@ -53,10 +53,13 @@ class MainActivity : ComponentActivity() {
         try {
             val text = contentResolver.openInputStream(uri)?.bufferedReader()?.use { it.readText() } ?: ""
             val name = uri.lastPathSegment ?: "wearable_file"
-            val js = "window.onWearableFileImported(${JSONObject.quote(text)}, ${JSONObject.quote(name)});"
-            webView.post { webView.evaluateJavascript(js, null) }
+            webView.post {
+                webView.evaluateJavascript(
+                    "window.onWearableFileImported(${JSONObject.quote(text)}, ${JSONObject.quote(name)});", null
+                )
+            }
         } catch (e: Exception) {
-            sendHealthError("Could not read wearable file: ${e.message}")
+            sendMessage("Could not read wearable file: ${e.message}")
         }
     }
 
@@ -66,16 +69,15 @@ class MainActivity : ComponentActivity() {
         if (uri == null || text == null) return@registerForActivityResult
         try {
             contentResolver.openOutputStream(uri)?.bufferedWriter()?.use { it.write(text) }
-            webView.post { webView.evaluateJavascript("window.onNativeMessage('Report saved successfully.');", null) }
+            sendMessage("Assessment report saved.")
         } catch (e: Exception) {
-            sendHealthError("Could not save report: ${e.message}")
+            sendMessage("Could not save report: ${e.message}")
         }
     }
 
     @SuppressLint("SetJavaScriptEnabled")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
         healthClient = if (HealthConnectClient.getSdkStatus(this) == HealthConnectClient.SDK_AVAILABLE) {
             HealthConnectClient.getOrCreate(this)
         } else null
@@ -94,42 +96,37 @@ class MainActivity : ComponentActivity() {
         setContentView(webView)
     }
 
+    override fun onDestroy() {
+        webView.removeJavascriptInterface("Android")
+        webView.destroy()
+        super.onDestroy()
+    }
+
     inner class AndroidBridge {
-        @JavascriptInterface
-        fun syncHealthConnect() {
-            runOnUiThread { startHealthSync() }
+        @JavascriptInterface fun syncHealthConnect() = runOnUiThread { startHealthSync() }
+        @JavascriptInterface fun importWearableFile() = runOnUiThread {
+            importLauncher.launch(arrayOf("application/json", "text/csv", "text/plain", "*/*"))
         }
-
-        @JavascriptInterface
-        fun importWearableFile() {
-            runOnUiThread { importLauncher.launch(arrayOf("application/json", "text/csv", "text/plain", "*/*")) }
-        }
-
-        @JavascriptInterface
-        fun saveReport(text: String) {
+        @JavascriptInterface fun saveReport(text: String) {
             pendingSaveText = text
             runOnUiThread { saveLauncher.launch("Seafarer_Fatigue_Assessment.txt") }
         }
-
-        @JavascriptInterface
-        fun openHealthSettings() {
-            runOnUiThread {
-                try {
-                    startActivity(Intent("android.health.connect.action.HEALTH_HOME_SETTINGS"))
-                } catch (_: Exception) {
-                    startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
-                }
+        @JavascriptInterface fun openHealthSettings() = runOnUiThread {
+            try {
+                startActivity(Intent("android.health.connect.action.HEALTH_HOME_SETTINGS"))
+            } catch (_: Exception) {
+                startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
             }
         }
-
-        @JavascriptInterface
-        fun platformInfo(): String = "Android offline edition 3.0"
+        @JavascriptInterface fun openPrivacy() = runOnUiThread {
+            startActivity(Intent(this@MainActivity, PrivacyActivity::class.java))
+        }
+        @JavascriptInterface fun platformInfo(): String = "Android offline research edition 4.0"
     }
 
     private fun startHealthSync() {
-        val client = healthClient
-        if (client == null) {
-            sendHealthError("Health Connect is unavailable on this device. Use wearable JSON/CSV import or manual entry.")
+        val client = healthClient ?: run {
+            sendMessage("Health Connect is unavailable on this device. Use JSON/CSV import or manual entry.")
             return
         }
         lifecycleScope.launch {
@@ -141,9 +138,15 @@ class MainActivity : ComponentActivity() {
                     permissionLauncher.launch(healthPermissions)
                 }
             } catch (e: Exception) {
-                sendHealthError("Health Connect permission check failed: ${e.message}")
+                sendMessage("Health Connect permission check failed: ${e.message}")
             }
         }
+    }
+
+    private fun overlapHours(start: Instant, end: Instant, windowStart: Instant, windowEnd: Instant): Double {
+        val s = if (start.isAfter(windowStart)) start else windowStart
+        val e = if (end.isBefore(windowEnd)) end else windowEnd
+        return if (e.isAfter(s)) Duration.between(s, e).toMinutes() / 60.0 else 0.0
     }
 
     private fun readHealthData() {
@@ -151,63 +154,99 @@ class MainActivity : ComponentActivity() {
         lifecycleScope.launch {
             try {
                 val now = Instant.now()
-                val sleepStart = now.minus(36, ChronoUnit.HOURS)
-                val physiologyStart = now.minus(7, ChronoUnit.DAYS)
-
+                val start8d = now.minus(8, ChronoUnit.DAYS)
                 val sleepRecords = client.readRecords(
                     ReadRecordsRequest(
                         recordType = SleepSessionRecord::class,
-                        timeRangeFilter = TimeRangeFilter.between(sleepStart, now),
+                        timeRangeFilter = TimeRangeFilter.between(start8d, now),
                         ascendingOrder = false,
-                        pageSize = 50
+                        pageSize = 200
                     )
                 ).records
 
-                // Sum sessions ending in the last 24 hours. This captures split sleep / naps.
                 val cutoff24 = now.minus(24, ChronoUnit.HOURS)
-                val recentSleep = sleepRecords.filter { it.endTime.isAfter(cutoff24) }
-                val sleepHours = recentSleep.sumOf {
-                    Duration.between(it.startTime, it.endTime).toMinutes().toDouble() / 60.0
-                }.coerceAtMost(14.0)
+                val cutoff48 = now.minus(48, ChronoUnit.HOURS)
+                val cutoff7d = now.minus(7, ChronoUnit.DAYS)
+                val sleep24 = sleepRecords.sumOf { overlapHours(it.startTime, it.endTime, cutoff24, now) }.coerceAtMost(16.0)
+                val sleep48 = sleepRecords.sumOf { overlapHours(it.startTime, it.endTime, cutoff48, now) }.coerceAtMost(32.0)
+                val sleep7Total = sleepRecords.sumOf { overlapHours(it.startTime, it.endTime, cutoff7d, now) }
+                val sleep7Avg = (sleep7Total / 7.0).coerceAtMost(16.0)
+                val episodes24 = sleepRecords.count { it.endTime.isAfter(cutoff24) && it.startTime.isBefore(now) }
+                val latestSleep = sleepRecords.maxByOrNull { it.endTime }
 
+                val stages24 = sleepRecords.filter { it.endTime.isAfter(cutoff24) }.flatMap { it.stages }
+                val awakeTypes = setOf(
+                    SleepSessionRecord.STAGE_TYPE_AWAKE,
+                    SleepSessionRecord.STAGE_TYPE_AWAKE_IN_BED,
+                    SleepSessionRecord.STAGE_TYPE_OUT_OF_BED
+                )
+                val sleepTypes = setOf(
+                    SleepSessionRecord.STAGE_TYPE_SLEEPING,
+                    SleepSessionRecord.STAGE_TYPE_LIGHT,
+                    SleepSessionRecord.STAGE_TYPE_DEEP,
+                    SleepSessionRecord.STAGE_TYPE_REM
+                )
+                val stageSleepMinutes = stages24.filter { it.stage in sleepTypes }
+                    .sumOf { Duration.between(it.startTime, it.endTime).toMinutes() }
+                val stageAwakeMinutes = stages24.filter { it.stage in awakeTypes }
+                    .sumOf { Duration.between(it.startTime, it.endTime).toMinutes() }
+                val stagedMinutes = stageSleepMinutes + stageAwakeMinutes
+                val sleepEfficiency = if (stagedMinutes > 0) 100.0 * stageSleepMinutes / stagedMinutes else null
+                val interruptions = if (stages24.isNotEmpty()) stages24.count { it.stage in awakeTypes } else null
+
+                val physiologyStart = now.minus(14, ChronoUnit.DAYS)
                 val restingRecords = client.readRecords(
                     ReadRecordsRequest(
                         recordType = RestingHeartRateRecord::class,
                         timeRangeFilter = TimeRangeFilter.between(physiologyStart, now),
                         ascendingOrder = false,
-                        pageSize = 50
+                        pageSize = 200
                     )
                 ).records
-                val restingHr = restingRecords.firstOrNull()?.beatsPerMinute?.toDouble()
+                val currentRhr = restingRecords.maxByOrNull { it.time }?.beatsPerMinute?.toDouble()
+                val rhrBaselineValues = restingRecords.filter { it.time.isBefore(cutoff24) }.map { it.beatsPerMinute.toDouble() }
+                val rhrBaseline = rhrBaselineValues.takeIf { it.isNotEmpty() }?.average()
 
                 val hrvRecords = client.readRecords(
                     ReadRecordsRequest(
                         recordType = HeartRateVariabilityRmssdRecord::class,
                         timeRangeFilter = TimeRangeFilter.between(physiologyStart, now),
                         ascendingOrder = false,
-                        pageSize = 50
+                        pageSize = 200
                     )
                 ).records
-                val hrv = hrvRecords.firstOrNull()?.heartRateVariabilityMillis
+                val currentHrv = hrvRecords.maxByOrNull { it.time }?.heartRateVariabilityMillis
+                val hrvBaselineValues = hrvRecords.filter { it.time.isBefore(cutoff24) }.map { it.heartRateVariabilityMillis }
+                val hrvBaseline = hrvBaselineValues.takeIf { it.isNotEmpty() }?.average()
 
                 val payload = JSONObject().apply {
                     put("source", "Android Health Connect")
                     put("timestamp", now.toString())
-                    if (sleepHours > 0) put("sleepHours", sleepHours)
-                    if (restingHr != null) put("restingHR", restingHr)
-                    if (hrv != null) put("hrv", hrv)
-                    put("note", "Sleep is calculated from Health Connect sleep sessions ending in the last 24 hours. Sleep efficiency and interruptions remain editable because not every wearable exposes consistent stage data.")
+                    if (sleep24 > 0) put("sleepHours", sleep24)
+                    if (sleep48 > 0) put("sleep48", sleep48)
+                    if (sleep7Avg > 0) put("sleep7Avg", sleep7Avg)
+                    put("sleepEpisodes24", episodes24)
+                    latestSleep?.let {
+                        put("sleepStart", it.startTime.toString())
+                        put("sleepEnd", it.endTime.toString())
+                    }
+                    sleepEfficiency?.let { put("sleepEfficiency", it) }
+                    interruptions?.let { put("sleepInterruptions", it) }
+                    currentRhr?.let { put("restingHR", it) }
+                    rhrBaseline?.let { put("restingHRBaseline", it) }
+                    currentHrv?.let { put("hrv", it) }
+                    hrvBaseline?.let { put("hrvBaseline", it) }
+                    put("note", "Wearable-estimated sleep, resting heart rate and HRV are read locally from Health Connect. Stage-derived efficiency/interruptions are supplied only when compatible stage data exists.")
                 }
-                val js = "window.onHealthConnectData(${payload.toString()});"
-                webView.post { webView.evaluateJavascript(js, null) }
+                webView.post { webView.evaluateJavascript("window.onHealthConnectData(${payload});", null) }
             } catch (e: Exception) {
-                sendHealthError("Could not read Health Connect data: ${e.message}")
+                sendMessage("Could not read Health Connect data: ${e.message}")
             }
         }
     }
 
-    private fun sendHealthError(message: String) {
-        val js = "window.onNativeMessage(${JSONObject.quote(message)});"
-        webView.post { webView.evaluateJavascript(js, null) }
+    private fun sendMessage(message: String) {
+        if (!::webView.isInitialized) return
+        webView.post { webView.evaluateJavascript("window.onNativeMessage(${JSONObject.quote(message)});", null) }
     }
 }
