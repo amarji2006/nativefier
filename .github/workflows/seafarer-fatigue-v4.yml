@@ -25,14 +25,22 @@ jobs:
         with:
           gradle-version: '8.13'
 
+      - name: Generate Gradle wrapper
+        working-directory: seafarer-fatigue-app-v3
+        run: gradle wrapper --gradle-version 8.13
+
       - name: Compile v4 debug APK
         working-directory: seafarer-fatigue-app-v3
-        run: gradle :app:assembleDebug --stacktrace
+        run: ./gradlew :app:assembleDebug --stacktrace
 
-      - name: Package validation artifact
+      - name: Package validation artifacts
         run: |
           cp seafarer-fatigue-app-v3/app/build/outputs/apk/debug/app-debug.apk Seafarer_Fatigue_AI_v4_validation.apk
           sha256sum Seafarer_Fatigue_AI_v4_validation.apk > Seafarer_Fatigue_AI_v4_validation_SHA256.txt
+          mkdir -p wrapper/gradle
+          cp seafarer-fatigue-app-v3/gradlew wrapper/
+          cp seafarer-fatigue-app-v3/gradlew.bat wrapper/
+          cp -R seafarer-fatigue-app-v3/gradle/wrapper wrapper/gradle/
 
       - name: Upload validation APK
         uses: actions/upload-artifact@v4
@@ -41,5 +49,13 @@ jobs:
           path: |
             Seafarer_Fatigue_AI_v4_validation.apk
             Seafarer_Fatigue_AI_v4_validation_SHA256.txt
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Upload Gradle wrapper
+        uses: actions/upload-artifact@v4
+        with:
+          name: Gradle_8_13_wrapper
+          path: wrapper/
           if-no-files-found: error
           retention-days: 7
