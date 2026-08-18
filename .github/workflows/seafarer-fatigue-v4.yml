@@ -1,9 +1,9 @@
-name: Build Seafarer Fatigue AI v4
+name: Build Seafarer Fatigue AI v4 Java25 Fix
 
 on:
   push:
     branches:
-      - seafarer-fatigue-playstore-v4
+      - seafarer-fatigue-playstore-v4-jdk25fix
   workflow_dispatch:
 
 jobs:
@@ -14,48 +14,48 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Java 17
+      - name: Set up Java 25
         uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '17'
+          java-version: '25'
 
-      - name: Set up Gradle 8.13
+      - name: Set up Gradle 9.1.0
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.13'
+          gradle-version: '9.1.0'
 
       - name: Generate Gradle wrapper
         working-directory: seafarer-fatigue-app-v3
-        run: gradle wrapper --gradle-version 8.13
+        run: gradle wrapper --gradle-version 9.1.0
 
-      - name: Compile v4 debug APK
+      - name: Compile v4.0.1 debug APK on Java 25
         working-directory: seafarer-fatigue-app-v3
         run: ./gradlew :app:assembleDebug --stacktrace
 
-      - name: Package validation artifacts
+      - name: Package artifacts
         run: |
-          cp seafarer-fatigue-app-v3/app/build/outputs/apk/debug/app-debug.apk Seafarer_Fatigue_AI_v4_validation.apk
-          sha256sum Seafarer_Fatigue_AI_v4_validation.apk > Seafarer_Fatigue_AI_v4_validation_SHA256.txt
+          cp seafarer-fatigue-app-v3/app/build/outputs/apk/debug/app-debug.apk Seafarer_Fatigue_AI_v4_0_1_Java25.apk
+          sha256sum Seafarer_Fatigue_AI_v4_0_1_Java25.apk > Seafarer_Fatigue_AI_v4_0_1_Java25_SHA256.txt
           mkdir -p wrapper/gradle
           cp seafarer-fatigue-app-v3/gradlew wrapper/
           cp seafarer-fatigue-app-v3/gradlew.bat wrapper/
           cp -R seafarer-fatigue-app-v3/gradle/wrapper wrapper/gradle/
 
-      - name: Upload validation APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Seafarer_Fatigue_AI_v4_validation
+          name: Seafarer_Fatigue_AI_v4_0_1_Java25
           path: |
-            Seafarer_Fatigue_AI_v4_validation.apk
-            Seafarer_Fatigue_AI_v4_validation_SHA256.txt
+            Seafarer_Fatigue_AI_v4_0_1_Java25.apk
+            Seafarer_Fatigue_AI_v4_0_1_Java25_SHA256.txt
           if-no-files-found: error
           retention-days: 7
 
-      - name: Upload Gradle wrapper
+      - name: Upload Gradle 9.1 wrapper
         uses: actions/upload-artifact@v4
         with:
-          name: Gradle_8_13_wrapper
+          name: Gradle_9_1_wrapper
           path: wrapper/
           if-no-files-found: error
           retention-days: 7
